@@ -1,0 +1,19 @@
+# .NET
+bin/
+obj/
+*.user
+
+# NuGet
+*.nupkg
+artifacts/
+
+# macOS
+.DS_Store
+
+# Native build output and upstream source cache (repo-only)
+**/build/
+**/.build/
+src/**/Native/iOS/.cache/
+
+# Sample local config
+samples/**/secrets.*

@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-ios</TargetFramework>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Kapusch.RevenueCatUI.iOS</RootNamespace>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Native/**</DefaultItemExcludes>
+    <PackageId>Kapusch.RevenueCatUI.iOS</PackageId>
+    <AssemblyName>Kapusch.RevenueCatUI.iOS</AssemblyName>
+    <Authors>Kapusch</Authors>
+    <Version>1.0.0-rc.1</Version>
+    <Description>Thin .NET iOS interop for RevenueCat Paywalls (RevenueCatUI), on top of the Kebechet.Maui.RevenueCat.iOS core binding.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/Kapusch/RevenueCatUIApisForiOSComponents</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageReadmeFile>nuget-readme.md</PackageReadmeFile>
+    <PackageTags>revenuecat;paywall;revenuecatui;maui;ios</PackageTags>
+    <PackageReleaseNotes>RevenueCatUI 5.83.1. See https://github.com/Kapusch/RevenueCatUIApisForiOSComponents/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <IncludeSymbols>false</IncludeSymbols>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- RevenueCatUI links RevenueCat.framework at run time. The core binding ships it, and it must
+         come from the same purchases-ios tag as DependencyLocks/purchases-ios.json. -->
+    <PackageReference Include="Kebechet.Maui.RevenueCat.iOS" Version="[5.83.1,5.83.2)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Native/**" />
+    <Content Remove="Native/**" />
+    <None Include="buildTransitive/**" Pack="true" PackagePath="buildTransitive/" />
+    <None Include="nuget-readme.md" Pack="true" PackagePath="/" />
+    <None Include="../../THIRD_PARTY_NOTICES.md" Pack="true" PackagePath="/" />
+    <None Include="../../ThirdPartyLicenses/**" Pack="true" PackagePath="licenses/" />
+    <None Include="Native/iOS/build/krcui.xcframework/**" Pack="true" PackagePath="native/krcui.xcframework/" />
+    <None Include="Native/iOS/build/RevenueCatUI.xcframework/**" Pack="true" PackagePath="native/RevenueCatUI.xcframework/" />
+  </ItemGroup>
+
+  <Target Name="ValidateNativeAssets" BeforeTargets="GenerateNuspec">
+    <Error Condition="!Exists('Native/iOS/build/krcui.xcframework/Info.plist') Or !Exists('Native/iOS/build/RevenueCatUI.xcframework/Info.plist')" Text="Build the native artifacts with Native/iOS/build.sh before packing." />
+  </Target>
+</Project>

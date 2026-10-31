@@ -1,0 +1,76 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build_pack_ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.3
+        # Pinned: the native artifacts must stay consumable by Xcode 26.3 toolchains.
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Scan public tree
+        env:
+          KAPUSCH_PRIVATE_TERMS: ${{ secrets.KAPUSCH_PRIVATE_TERMS }}
+        run: python3 scripts/verify-public.py
+
+      - name: Verify dependency lock
+        run: python3 scripts/verify-dependency-lock.py
+
+      - name: Install iOS workload
+        run: dotnet workload install ios --version 10.0.203
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.csproj') }}
+
+      - name: Cache purchases-ios source and archives
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/Kapusch.RevenueCatUIApisForiOSComponents/Native/iOS/.cache/purchases-ios-*
+            src/Kapusch.RevenueCatUIApisForiOSComponents/Native/iOS/.cache/archives-*
+          key: ${{ runner.os }}-purchases-ios-xcode26.3-${{ hashFiles('DependencyLocks/purchases-ios.json') }}
+
+      - name: Build native artifacts
+        run: bash src/Kapusch.RevenueCatUIApisForiOSComponents/Native/iOS/build.sh
+
+      - name: Pack
+        run: |
+          dotnet pack src/Kapusch.RevenueCatUIApisForiOSComponents/Kapusch.RevenueCatUIApisForiOSComponents.csproj \
+            -c Release \
+            -o artifacts/nuget
+
+      - name: Validate package
+        run: python3 scripts/verify-package.py
+
+      - name: Check RevenueCatUI against the core binding
+        run: python3 scripts/verify-core-abi.py
+
+      - name: Build sample (simulator)
+        run: |
+          dotnet build samples/Smoke/Smoke.csproj \
+            -c Release \
+            -p:RuntimeIdentifier=iossimulator-arm64 \
+            -p:EnableCodeSigning=false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget
+          path: artifacts/nuget/*.nupkg

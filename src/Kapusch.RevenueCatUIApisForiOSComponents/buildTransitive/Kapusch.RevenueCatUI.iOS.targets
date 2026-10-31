@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+    <_KapuschRevenueCatUINativeRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../native'))</_KapuschRevenueCatUINativeRoot>
+    <_KapuschRevenueCatUINativeRoot Condition="'$(UseKapuschRevenueCatUIiOSInteropFromSource)' == 'true'">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../Native/iOS/build'))</_KapuschRevenueCatUINativeRoot>
+  </PropertyGroup>
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <NativeReference Include="$(_KapuschRevenueCatUINativeRoot)/krcui.xcframework">
+      <Kind>Static</Kind>
+      <ForceLoad>true</ForceLoad>
+      <Frameworks>Foundation UIKit</Frameworks>
+    </NativeReference>
+    <NativeReference Include="$(_KapuschRevenueCatUINativeRoot)/RevenueCatUI.xcframework">
+      <Kind>Framework</Kind>
+      <Frameworks>SwiftUI Combine WebKit AVKit SafariServices StoreKit</Frameworks>
+    </NativeReference>
+  </ItemGroup>
+  <Target Name="ValidateRevenueCatUIiOSConsumer" BeforeTargets="CoreCompile" Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <Error Condition="!Exists('$(_KapuschRevenueCatUINativeRoot)/krcui.xcframework/Info.plist') Or !Exists('$(_KapuschRevenueCatUINativeRoot)/RevenueCatUI.xcframework/Info.plist')" Text="Missing RevenueCatUI native artifacts." />
+  </Target>
+</Project>
