@@ -1,0 +1,143 @@
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      manual_version:
+        description: 'Force a specific version for NuGet.org publish (e.g., 1.0.0 or 1.0.0-rc.1). If empty, defaults to auto-generated preview for GitHub Packages.'
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  pack_and_publish:
+    runs-on: macos-15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine package version
+        id: version
+        shell: bash
+        run: |
+          REF="${{ github.ref }}"
+          MANUAL_VERSION="${{ github.event.inputs.manual_version }}"
+          CSPROJ="src/Kapusch.RevenueCatUIApisForiOSComponents/Kapusch.RevenueCatUIApisForiOSComponents.csproj"
+          BASE_VERSION=$(grep -oE '<Version>[^<]+' "$CSPROJ" | head -n 1 | sed 's/<Version>//' || echo "0.1.0")
+
+          if [[ -n "$MANUAL_VERSION" ]]; then
+            VERSION="$MANUAL_VERSION"
+            PUBLISH_TARGET="nuget"
+            echo "Manual version provided ($VERSION). Triggering NuGet.org publish."
+          elif [[ "$REF" =~ ^refs/tags/v ]]; then
+            VERSION="${REF#refs/tags/v}"
+            PUBLISH_TARGET="nuget"
+          else
+            COMMIT_SHORT=$(git rev-parse --short HEAD)
+            RUN_NUMBER="${{ github.run_number }}"
+            VERSION="${BASE_VERSION}-preview.${RUN_NUMBER}.${COMMIT_SHORT}"
+            PUBLISH_TARGET="github"
+          fi
+
+          if [[ "$PUBLISH_TARGET" == "nuget" ]]; then
+            git fetch origin main
+            if ! git merge-base --is-ancestor "${{ github.sha }}" origin/main; then
+              echo "ERROR: NuGet.org releases must be reachable from origin/main."
+              exit 1
+            fi
+            if [[ -n "$MANUAL_VERSION" && "$REF" != "refs/heads/main" ]]; then
+              echo "ERROR: Manual NuGet.org releases must be dispatched from main."
+              exit 1
+            fi
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "publish_target=${PUBLISH_TARGET}" >> "$GITHUB_OUTPUT"
+          echo "Package version: ${VERSION}"
+          echo "Publish target: ${PUBLISH_TARGET}"
+
+      - name: Select Xcode 26.3
+        # Pinned: the native artifacts must stay consumable by Xcode 26.3 toolchains.
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Scan public tree
+        env:
+          KAPUSCH_PRIVATE_TERMS: ${{ secrets.KAPUSCH_PRIVATE_TERMS }}
+        run: python3 scripts/verify-public.py
+
+      - name: Verify dependency lock
+        run: python3 scripts/verify-dependency-lock.py
+
+      - name: Install iOS workload
+        run: |
+          dotnet workload install ios --version 10.0.203
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', '**/*.csproj') }}
+
+      - name: Cache purchases-ios source and archives
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/Kapusch.RevenueCatUIApisForiOSComponents/Native/iOS/.cache/purchases-ios-*
+            src/Kapusch.RevenueCatUIApisForiOSComponents/Native/iOS/.cache/archives-*
+          key: ${{ runner.os }}-purchases-ios-xcode26.3-${{ hashFiles('DependencyLocks/purchases-ios.json') }}
+
+      - name: Build native artifacts
+        run: bash src/Kapusch.RevenueCatUIApisForiOSComponents/Native/iOS/build.sh
+
+      - name: Pack
+        run: |
+          dotnet pack src/Kapusch.RevenueCatUIApisForiOSComponents/Kapusch.RevenueCatUIApisForiOSComponents.csproj \
+            -c Release \
+            -o artifacts/nuget \
+            /p:PackageVersion="${{ steps.version.outputs.version }}"
+
+      - name: Validate package
+        run: python3 scripts/verify-package.py
+
+      - name: Check RevenueCatUI against the core binding
+        run: python3 scripts/verify-core-abi.py
+
+      - name: Push to NuGet.org
+        if: steps.version.outputs.publish_target == 'nuget'
+        uses: NuGet/login@v1
+        id: nuget_login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to NuGet.org
+        if: steps.version.outputs.publish_target == 'nuget'
+        run: |
+          dotnet nuget push artifacts/nuget/*.nupkg \
+            --api-key "${{ steps.nuget_login.outputs.NUGET_API_KEY }}" \
+            --source "https://api.nuget.org/v3/index.json" \
+            --skip-duplicate
+
+      - name: Push to GitHub Packages
+        if: steps.version.outputs.publish_target == 'github'
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dotnet nuget push artifacts/nuget/*.nupkg \
+            --api-key "$NUGET_AUTH_TOKEN" \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --skip-duplicate
