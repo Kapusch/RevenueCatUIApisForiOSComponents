@@ -9,6 +9,6 @@
     <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Kapusch.RevenueCatUI.iOS" Version="1.0.0-rc.1" />
+    <PackageReference Include="Kapusch.RevenueCatUI.iOS" Version="1.0.0" />
   </ItemGroup>
 </Project>
