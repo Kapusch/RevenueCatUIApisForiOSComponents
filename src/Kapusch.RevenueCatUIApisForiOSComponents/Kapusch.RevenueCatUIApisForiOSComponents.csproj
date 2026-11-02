@@ -10,7 +10,7 @@
     <PackageId>Kapusch.RevenueCatUI.iOS</PackageId>
     <AssemblyName>Kapusch.RevenueCatUI.iOS</AssemblyName>
     <Authors>Kapusch</Authors>
-    <Version>1.0.0-rc.1</Version>
+    <Version>1.0.0</Version>
     <Description>Thin .NET iOS interop for RevenueCat Paywalls (RevenueCatUI), on top of the Kebechet.Maui.RevenueCat.iOS core binding.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/Kapusch/RevenueCatUIApisForiOSComponents</RepositoryUrl>

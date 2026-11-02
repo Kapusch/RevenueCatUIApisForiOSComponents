@@ -3,7 +3,7 @@
 ## Install
 
 ```xml
-<PackageReference Include="Kapusch.RevenueCatUI.iOS" Version="1.0.0-rc.1" />
+<PackageReference Include="Kapusch.RevenueCatUI.iOS" Version="1.0.0" />
 ```
 
 The package brings `Kebechet.Maui.RevenueCat.iOS` in the matching version range. Configure the core
